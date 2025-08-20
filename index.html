@@ -184,11 +184,16 @@
             };
 
             try {
+                // When running on GitHub or another server, you must provide your own API key.
+                // Get a key from Google AI Studio and paste it here.
+                const API_KEY = "AIzaSyBtDKFSrtJP8rUp3-Oa7UEZhzMQjiD3JLQ"; // <-- PASTE YOUR API KEY HERE
+
                 let response;
                 let attempts = 0;
                 let delay = 1000;
                 while (attempts < 5) {
-                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`, {
+                    // The API key is now correctly included in the fetch request URL.
+                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
