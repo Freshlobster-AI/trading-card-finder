@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Standard HTML head content -->
+    <meta charset="UTF-8">
+    <!-- This makes the website responsive to different screen sizes -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sports Card Scanner</title>
+    <!-- This links to Tailwind CSS, a library that makes styling easier -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- This links to the "Inter" font from Google Fonts for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- This is our custom CSS for styling elements -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* This style is applied when a file is being dragged over the drop zone */
+        .drop-zone-active {
+            border-color: #3b82f6; /* A bright blue color */
+            background-color: #374151; /* A slightly lighter gray */
+        }
+        /* This creates the spinning loader animation */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey circle */
+            border-top: 4px solid #3498db; /* Blue for the spinning part */
+            border-radius: 50%; /* Makes it a circle */
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite; /* Applies the spin animation */
+        }
+        /* This defines the keyframes for the spinning animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main container for the entire application -->
+    <div class="w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        
+        <!-- Header Section -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-100">Sports Card Scanner</h1>
+            <p class="text-gray-400 mt-2">Upload a photo of a trading card to extract its key features.</p>
+        </div>
+
+        <!-- Main content grid, splits into two columns on medium screens and larger -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- Left Column: For uploading and previewing the image -->
+            <div class="flex flex-col items-center">
+                
+                <!-- The drag-and-drop zone -->
+                <div id="drop-zone" class="w-full h-64 border-2 border-dashed border-gray-600 rounded-lg flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-500 transition-colors duration-300 bg-gray-900/50 p-4">
+                    <svg class="w-12 h-12 text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-gray-400">Drag & drop an image here</p>
+                    <p class="text-gray-500 text-sm">or</p>
+                    <button id="browse-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Browse Files
+                    </button>
+                    <!-- This is the actual file input, but it's hidden. We trigger it with the button. -->
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                </div>
+                
+                <!-- Container for the image preview, hidden by default -->
+                <div id="image-preview-container" class="mt-6 w-full max-w-sm hidden">
+                    <h3 class="font-semibold text-lg mb-2 text-center">Image Preview</h3>
+                    <img id="image-preview" src="" alt="Image Preview" class="rounded-lg shadow-lg w-full h-auto object-contain max-h-80">
+                </div>
+                 <!-- The "Scan Card" button, also hidden by default -->
+                 <button id="scan-btn" class="mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors w-full max-w-sm hidden disabled:bg-gray-500 disabled:cursor-not-allowed">
+                    Scan Card
+                </button>
+            </div>
+
+            <!-- Right Column: For displaying the results -->
+            <div class="flex flex-col">
+                <h2 class="text-2xl font-bold mb-4 text-gray-200">Extracted Data</h2>
+                <!-- The spinning loader, hidden by default -->
+                <div id="loader" class="hidden self-center mt-16">
+                    <div class="loader"></div>
+                    <p class="text-gray-400 mt-4">Analyzing card...</p>
+                </div>
+                <!-- Container for the results table, hidden by default -->
+                <div id="results-container" class="hidden w-full bg-gray-900/50 p-4 rounded-lg flex-grow">
+                     <div class="overflow-x-auto">
+                        <!-- The table where results will be shown -->
+                        <table id="results-table" class="min-w-full text-sm text-left text-gray-300">
+                           <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 rounded-l-lg">Feature</th>
+                                    <th scope="col" class="px-6 py-3 rounded-r-lg">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data rows will be inserted here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- The button to copy the data -->
+                    <button id="copy-btn" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Copy Row for Spreadsheet
+                    </button>
+                </div>
+                 <!-- A place to show error or success messages -->
+                 <div id="message-box" class="mt-4 text-center text-red-400"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM element references ---
+        // We get references to all the important HTML elements so we can interact with them in JavaScript.
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const browseBtn = document.getElementById('browse-btn');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const scanBtn = document.getElementById('scan-btn');
+        const loader = document.getElementById('loader');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsTable = document.getElementById('results-table');
+        const copyBtn = document.getElementById('copy-btn');
+        const messageBox = document.getElementById('message-box');
+
+        // This variable will hold the image data after it's been uploaded.
+        let cardImageData = null;
+
+        // --- Event Listeners ---
+        // These lines "listen" for user actions like clicks, drags, and file uploads.
+
+        // When the "Browse Files" button is clicked, it programmatically clicks the hidden file input.
+        browseBtn.addEventListener('click', () => fileInput.click());
+
+        // When a file is chosen through the file browser, this function is called.
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+        
+        // When a file is dragged over the drop zone, we prevent the browser's default behavior.
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone-active'); // Add styling to show it's active.
+        });
+
+        // When the dragged file leaves the drop zone, we remove the active styling.
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-zone-active'));
+
+        // When a file is dropped onto the zone, this function is called.
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); // Prevent the browser from opening the file.
+            dropZone.classList.remove('drop-zone-active');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+
+        // When the "Scan Card" button is clicked, we call the analyzeCard function.
+        scanBtn.addEventListener('click', () => {
+            if (cardImageData) analyzeCard(cardImageData);
+        });
+
+        // When the "Copy" button is clicked, we call the copyTableData function.
+        copyBtn.addEventListener('click', copyTableData);
+
+        // --- Core Functions ---
+
+        /**
+         * Handles the selected file. It checks if it's an image, reads it,
+         * and prepares it for preview and analysis.
+         * @param {File} file The image file selected by the user.
+         */
+        function handleFile(file) {
+            // Make sure the file is an image.
+            if (!file.type.startsWith('image/')) {
+                showMessage('Error: Please upload an image file.');
+                return;
+            }
+            
+            // The FileReader object lets web applications asynchronously read the contents of files.
+            const reader = new FileReader();
+            
+            // This function is called once the file has been successfully read.
+            reader.onload = (e) => {
+                // e.target.result contains the file's data as a Base64 encoded string.
+                // We split it to get just the data part, without the "data:image/jpeg;base64," prefix.
+                cardImageData = e.target.result.split(',')[1];
+                // Set the image preview source to the full data URL.
+                imagePreview.src = e.target.result;
+                // Show the preview container and the scan button.
+                imagePreviewContainer.classList.remove('hidden');
+                scanBtn.classList.remove('hidden');
+                scanBtn.disabled = false;
+                // Hide any previous results.
+                resultsContainer.classList.add('hidden');
+                showMessage(''); // Clear any old messages.
+            };
+            
+            // If there's an error reading the file, show a message.
+            reader.onerror = () => showMessage('Error: Could not read the file.');
+            
+            // This starts the reading process. The result will be a data URL.
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Sends the image data to the Gemini AI for analysis.
+         * This is an "async" function, which means it can use "await" for network requests.
+         * @param {string} base64ImageData The base64-encoded image data.
+         */
+        async function analyzeCard(base64ImageData) {
+            // Show the loader and hide old results while we wait for the AI.
+            showMessage('');
+            loader.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            scanBtn.disabled = true;
+
+            // This is the prompt we send to the AI, telling it what to do.
+            const prompt = `
+                Analyze this image of a sports trading card. Extract the following key features.
+                If a feature is not present or cannot be determined, return null for its value.
+                - Player Name
+                - Team
+                - Card Year (the season it represents, e.g., 2022-23)
+                - Card Number (e.g., #123)
+                - Card Manufacturer (e.g., Topps, Panini, Upper Deck)
+                - Product Name (e.g., Prizm, Topps Chrome, Donruss Optic)
+                - Any special attributes or parallels (e.g., "Rookie Card", "Autograph", "Refractor", "Prizm", "Serial Numbered", "Jersey Patch"). List them in an array.
+            `;
+
+            // This schema tells the AI exactly what format the JSON response should be in.
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    "playerName": { "type": "STRING" },
+                    "team": { "type": "STRING" },
+                    "cardYear": { "type": "STRING" },
+                    "cardNumber": { "type": "STRING" },
+                    "manufacturer": { "type": "STRING" },
+                    "productName": { "type": "STRING" },
+                    "specialAttributes": { "type": "ARRAY", "items": { "type": "STRING" } }
+                },
+                required: ["playerName", "team", "cardYear", "cardNumber", "manufacturer", "productName", "specialAttributes"]
+            };
+
+            // This is the complete payload (data packet) we're sending to the API.
+            const payload = {
+                contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64ImageData } }] }],
+                generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+            };
+            
+            // The "try...catch" block handles potential errors during the API call.
+            try {
+                let response;
+                let attempts = 0;
+                let delay = 1000; // Start with a 1-second delay
+                // This loop implements "exponential backoff" to retry the request if the server is busy.
+                while (attempts < 5) {
+                    // "fetch" is the browser's built-in way to make network requests.
+                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) break; // If the request was successful, exit the loop.
+                    // If the server is busy (status 429) or has an error (5xx), wait and try again.
+                    if (response.status === 429 || response.status >= 500) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Double the delay for the next attempt.
+                        attempts++;
+                    } else {
+                        // For other errors, don't retry, just throw an error.
+                        throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+                    }
+                }
+                if (!response.ok) throw new Error(`API request failed after multiple retries with status ${response.status}.`);
+                
+                // Parse the JSON response from the API.
+                const result = await response.json();
+                
+                // Check if the response has the data in the expected place.
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    // The actual data is a string of JSON, so we need to parse it again.
+                    const cardData = JSON.parse(result.candidates[0].content.parts[0].text);
+                    // Call the function to display the results on the page.
+                    displayResults(cardData);
+                } else {
+                    throw new Error("Could not parse valid data from the API response.");
+                }
+            } catch (error) {
+                // If anything went wrong, log it to the console and show a user-friendly message.
+                console.error("Error during API call:", error);
+                showMessage(`Error: ${error.message}. Please try again.`);
+            } finally {
+                // This "finally" block runs whether the request succeeded or failed.
+                // We hide the loader and re-enable the scan button.
+                loader.classList.add('hidden');
+                scanBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Displays the extracted card data in the results table.
+         * @param {object} data The card data object from the API.
+         */
+        function displayResults(data) {
+            const tableBody = resultsTable.querySelector('tbody');
+            tableBody.innerHTML = ''; // Clear any previous results from the table.
+
+            // This object maps the data keys from the AI to user-friendly names.
+            const featureMapping = {
+                playerName: 'Player Name',
+                team: 'Team',
+                cardYear: 'Year',
+                cardNumber: 'Card #',
+                manufacturer: 'Manufacturer',
+                productName: 'Product Name',
+                specialAttributes: 'Attributes'
+            };
+
+            // Loop through each feature and create a new row in the table for it.
+            for (const key in featureMapping) {
+                const row = document.createElement('tr');
+                row.className = 'bg-gray-800 border-b border-gray-700';
+
+                // Create the first cell for the feature name.
+                const featureCell = document.createElement('td');
+                featureCell.className = 'px-6 py-4 font-medium text-gray-200 whitespace-nowrap';
+                featureCell.textContent = featureMapping[key];
+
+                // Create the second cell for the feature value.
+                const valueCell = document.createElement('td');
+                valueCell.className = 'px-6 py-4';
+                
+                let value = data[key];
+                // If the value is an array (like special attributes), join it into a single string.
+                if (Array.isArray(value)) {
+                    value = value.length > 0 ? value.join(', ') : 'N/A';
+                }
+                // Display the value, or "N/A" if it's missing.
+                valueCell.textContent = value || 'N/A';
+                
+                // Add the cells to the row, and the row to the table body.
+                row.appendChild(featureCell);
+                row.appendChild(valueCell);
+                tableBody.appendChild(row);
+            }
+
+            // Finally, make the results container visible.
+            resultsContainer.classList.remove('hidden');
+        }
+
+        /**
+         * Copies the extracted data to the clipboard as a single, tab-separated row.
+         */
+        function copyTableData() {
+            const values = [];
+            const rows = resultsTable.querySelectorAll('tbody tr');
+            
+            // Go through each row in the results table.
+            rows.forEach(row => {
+                // Get the second cell (td) in the row, which contains the value.
+                const valueCell = row.querySelectorAll('td')[1];
+                if (valueCell) {
+                    values.push(valueCell.textContent); // Add its text to our values array.
+                }
+            });
+
+            // Join all the values together with a tab character between them. This is perfect for spreadsheets.
+            const tsvContent = values.join('\t') + '\n';
+
+            // To copy to the clipboard, we have to create a temporary textarea element.
+            const textArea = document.createElement('textarea');
+            textArea.value = tsvContent;
+            document.body.appendChild(textArea);
+            textArea.select(); // Select the text inside it.
+            try {
+                document.execCommand('copy'); // Execute the copy command.
+                showMessage('Copied to clipboard!', 'green'); // Show a success message.
+            } catch (err) {
+                showMessage('Failed to copy text.'); // Show an error if it fails.
+                console.error('Copy failed', err);
+            }
+            // Remove the temporary textarea from the page.
+            document.body.removeChild(textArea);
+        }
+
+        /**
+         * Displays a message to the user in the message box area.
+         * @param {string} text The message to display.
+         * @param {string} color The color of the message ('red' for errors, 'green' for success).
+         */
+        function showMessage(text, color = 'red') {
+            messageBox.textContent = text;
+            // Change the text color based on the 'color' parameter.
+            messageBox.className = `mt-4 text-center ${color === 'green' ? 'text-green-400' : 'text-red-400'}`;
+            // If it's a success message, make it disappear after 3 seconds.
+            if (color === 'green') {
+                setTimeout(() => messageBox.textContent = '', 3000);
+            }
+        }
+    </script>
+</body>
+</html>
